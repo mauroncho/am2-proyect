@@ -3,6 +3,7 @@
  */
 let faceMesh;
 let options = { maxFaces: 1, refineLandmarks: false, flipped: false };
+let face = [];
 
 /**
  * variables
@@ -14,13 +15,25 @@ function preload() {
 }
 
 function setup() {
-  createCanvas(700, 500, WEBGL);
+  createCanvas(700, 500);
   video = createCapture(VIDEO);
+  video.hide();
+
+  faceMesh.detectStart(video, gotFace);
 }
 
 function draw() {
-  translate(-(width / 2), -(height / 2));
+  // translate(-(width / 2), -(height / 2));
   background(220);
   fill(255, 0, 0);
   circle(0, 0, 20);
+}
+
+/**
+ * aditional functions
+ */
+
+function gotFace(result) {
+  face = result;
+  console.log(face);
 }
