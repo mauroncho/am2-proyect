@@ -36,17 +36,14 @@ function draw() {
       height: ovalHeight,
     } = face.faceOval;
 
-    // Recortar región original (sin escalar)
     let pixelOval = video.get(ovalX, ovalY, ovalWidth, ovalHeight);
     pixelOval.filter(BLUR, 8);
 
-    // Máscara ovalada del mismo tamaño que la imagen recortada
     let maskImg = createGraphics(ovalWidth, ovalHeight);
     maskImg.noStroke();
     maskImg.fill(255);
     maskImg.ellipse(ovalWidth / 2, ovalHeight / 2, ovalWidth, ovalHeight);
 
-    // Aplicar máscara
     pixelOval.mask(maskImg);
 
     image(
