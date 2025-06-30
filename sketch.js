@@ -23,7 +23,6 @@ function draw() {
 
   let videoW = video.width;
   let videoH = video.height;
-
   let scaleX = width / videoW;
   let scaleY = height / videoH;
 
@@ -37,7 +36,8 @@ function draw() {
     } = face.faceOval;
 
     let pixelOval = video.get(ovalX, ovalY, ovalWidth, ovalHeight);
-    pixelOval.filter(BLUR, 8);
+    pixelOval.filter(BLUR, 5);
+    pixelOval.filter(POSTERIZE);
 
     let maskImg = createGraphics(ovalWidth, ovalHeight);
     maskImg.noStroke();
