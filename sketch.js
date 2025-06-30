@@ -1,29 +1,15 @@
-/**
- * faceMesh variables
- */
-
 let faceMesh;
 let options = { maxFaces: 1, refineLandmarks: false, flipped: false };
 let faces = [];
 let face;
-let faceDetected = 0;
-
-/**
- * variables
- */
-
 let video;
-2;
-let ms;
-let scanY = 0;
-let scanDir = 1;
 
 function preload() {
   faceMesh = ml5.faceMesh(options);
 }
 
 function setup() {
-  createCanvas(700, 500);
+  createCanvas(window.innerWidth, window.innerHeight);
   video = createCapture(VIDEO);
   video.hide();
 
@@ -33,50 +19,43 @@ function setup() {
 }
 
 function draw() {
-  ms = millis();
-
   image(video, 0, 0, width, height);
+
+  let videoW = video.width;
+  let videoH = video.height;
+
+  let scaleX = width / videoW;
+  let scaleY = height / videoH;
 
   if (faces.length > 0) {
     face = faces[0];
-    let box = face.box;
-    let top = box.yMin + 10;
-    let bottom = box.yMin + box.height + 10;
-    // console.log(top, bottom);
+    let {
+      x: ovalX,
+      y: ovalY,
+      width: ovalWidth,
+      height: ovalHeight,
+    } = face.faceOval;
 
-    if (scanY === 0) scanY = top;
+    // Recortar región original (sin escalar)
+    let pixelOval = video.get(ovalX, ovalY, ovalWidth, ovalHeight);
+    pixelOval.filter(BLUR, 8);
 
-    if (faceDetected === 0) faceDetected = ms;
-    push();
-    noFill();
-    strokeWeight(2);
-    rect(box.xMin + 30, box.yMin + 10, box.width, box.height);
-    pop();
+    // Máscara ovalada del mismo tamaño que la imagen recortada
+    let maskImg = createGraphics(ovalWidth, ovalHeight);
+    maskImg.noStroke();
+    maskImg.fill(255);
+    maskImg.ellipse(ovalWidth / 2, ovalHeight / 2, ovalWidth, ovalHeight);
 
-    if (ms - faceDetected > 1500) {
-      push();
-      fill(0);
-      textSize(40);
-      text("HUMAN DETECTED", width * 0.5, height * 0.1);
-      pop();
-    }
+    // Aplicar máscara
+    pixelOval.mask(maskImg);
 
-    if (ms - faceDetected > 3000) {
-      push();
-      stroke(0, 255, 0);
-      strokeWeight(2);
-      line(box.xMin + 30, scanY, box.xMin + 30 + box.width, scanY);
-      pop();
-
-      scanY += scanDir * 1.5;
-
-      if (scanY >= bottom || scanY <= top) {
-        scanDir *= -1;
-      }
-    }
-  } else {
-    faceDetected = 0;
-    scanY = 0;
+    image(
+      pixelOval,
+      ovalX * scaleX,
+      ovalY * scaleY,
+      ovalWidth * scaleX,
+      ovalHeight * scaleY
+    );
   }
 }
 
@@ -84,8 +63,12 @@ function mousePressed() {
   console.log(face);
 }
 
+function windowResized() {
+  resizeCanvas(window.innerWidth, window.innerHeight);
+}
+
 /**
- * aditional functions
+ * helpers
  */
 
 function gotFace(result) {
