@@ -1,5 +1,4 @@
 let faceMesh;
-let backSound;
 let soundFx;
 let options = { maxFaces: 1, refineLandmarks: false, flipped: false };
 let faces = [];
@@ -9,9 +8,18 @@ let video;
 let maskAlpha = 0;
 let soundVol = 0;
 
+// modos de efecto
+let effectModes = ["blur", "noise", "storedFace", "whiteSquare"];
+let effectIndex = 0;
+let effectMode = effectModes[effectIndex];
+
+// caras guardadas
+let storedFaces = [];
+let hadFace = false; // bandera para detectar aparición nueva
+
 function preload() {
   faceMesh = ml5.faceMesh(options);
-  soundFx = loadSound("./sound/perverts-sound.mp3");
+  soundFx = loadSound("./sound/sound.mp3");
 }
 
 function setup() {
@@ -19,6 +27,7 @@ function setup() {
   video = createCapture(VIDEO);
   video.hide();
   faceMesh.detectStart(video, gotFace);
+
   soundFx.loop();
   soundFx.setVolume(0);
 }
@@ -31,7 +40,7 @@ function draw() {
   let scaleX = width / videoW;
   let scaleY = height / videoH;
 
-  // manejo de la opacidad de la máscara
+  // manejo de opacidad y volumen
   if (faces.length > 0) {
     maskAlpha = lerp(maskAlpha, 255, 0.009);
     soundVol = lerp(soundVol, 1, 0.02);
@@ -39,8 +48,6 @@ function draw() {
     maskAlpha = lerp(maskAlpha, 0, 0.05);
     soundVol = lerp(soundVol, 0, 0.025);
   }
-
-  // aplicar volumen suavizado
   soundFx.setVolume(soundVol);
 
   if (faces.length > 0 && maskAlpha > 1) {
@@ -52,17 +59,72 @@ function draw() {
       height: ovalHeight,
     } = face.faceOval;
 
+    // recorte actual de la cara
     let pixelOval = video.get(ovalX, ovalY, ovalWidth, ovalHeight);
-    pixelOval.filter(BLUR, 5);
-    pixelOval.filter(POSTERIZE);
 
-    // creación de máscara
-    let maskImg = createGraphics(ovalWidth, ovalHeight);
-    maskImg.ellipse(ovalWidth / 2, ovalHeight / 2, ovalWidth, ovalHeight);
-    pixelOval.mask(maskImg);
+    // --- detectar aparición de nueva cara ---
+    if (!hadFace) {
+      // guardar esta cara
+      storedFaces.push(pixelOval.get());
+      if (storedFaces.length > 5) {
+        storedFaces.shift(); // mantener máximo de 5
+      }
+      console.log("Nueva cara guardada. Total:", storedFaces.length);
+
+      // reiniciar a blur
+      effectMode = "blur";
+      effectIndex = 0;
+    }
+    hadFace = true;
+
+    // --- aplicar efecto según el modo ---
+    if (effectMode === "blur") {
+      pixelOval.filter(BLUR, 5);
+      pixelOval.filter(POSTERIZE);
+
+      // aplicar máscara
+      let maskImg = createGraphics(ovalWidth, ovalHeight);
+      maskImg.ellipse(ovalWidth / 2, ovalHeight / 2, ovalWidth, ovalHeight);
+      pixelOval.mask(maskImg);
+    } else if (effectMode === "noise") {
+      // glitch: ruido blanco brusco
+      pixelOval.loadPixels();
+      for (let i = 0; i < pixelOval.pixels.length; i += 4) {
+        let v = random(255);
+        pixelOval.pixels[i] = v;
+        pixelOval.pixels[i + 1] = v;
+        pixelOval.pixels[i + 2] = v;
+        pixelOval.pixels[i + 3] = 255;
+      }
+      pixelOval.updatePixels();
+
+      // aplicar máscara
+      let maskImg = createGraphics(ovalWidth, ovalHeight);
+      maskImg.ellipse(ovalWidth / 2, ovalHeight / 2, ovalWidth, ovalHeight);
+      pixelOval.mask(maskImg);
+    } else if (effectMode === "storedFace" && storedFaces.length > 0) {
+      // cara random del array
+      let randomFace = random(storedFaces);
+      pixelOval = randomFace.get();
+
+      // aplicar máscara
+      let maskImg = createGraphics(ovalWidth, ovalHeight);
+      maskImg.ellipse(ovalWidth / 2, ovalHeight / 2, ovalWidth, ovalHeight);
+      pixelOval.mask(maskImg);
+    } else if (effectMode === "whiteSquare") {
+      // cara rellena de blanco (usando la máscara)
+      pixelOval = createGraphics(ovalWidth, ovalHeight);
+      pixelOval.noStroke();
+      pixelOval.fill(255);
+      pixelOval.ellipse(ovalWidth / 2, ovalHeight / 2, ovalWidth, ovalHeight);
+    }
 
     push();
-    tint(255, maskAlpha);
+    if (effectMode === "noise") {
+      tint(255, 255); // glitch sin fade
+    } else {
+      tint(255, maskAlpha);
+    }
     image(
       pixelOval,
       ovalX * scaleX,
@@ -71,11 +133,18 @@ function draw() {
       ovalHeight * scaleY
     );
     pop();
+  } else {
+    hadFace = false; // si no hay cara, reseteamos bandera
   }
 }
 
-function mousePressed() {
-  console.log(face);
+// --- cambiar efecto con barra espaciadora ---
+function keyPressed() {
+  if (key === " ") {
+    effectIndex = (effectIndex + 1) % effectModes.length;
+    effectMode = effectModes[effectIndex];
+    console.log("Modo:", effectMode);
+  }
 }
 
 function windowResized() {
