@@ -1,21 +1,26 @@
 let faceMesh;
+let backSound;
+let soundFx;
 let options = { maxFaces: 1, refineLandmarks: false, flipped: false };
 let faces = [];
 let face;
 let video;
 
+let maskAlpha = 0;
+let soundVol = 0;
+
 function preload() {
   faceMesh = ml5.faceMesh(options);
+  soundFx = loadSound("./sound/perverts-sound.mp3");
 }
 
 function setup() {
   createCanvas(window.innerWidth, window.innerHeight);
   video = createCapture(VIDEO);
   video.hide();
-
   faceMesh.detectStart(video, gotFace);
-
-  textAlign(CENTER);
+  soundFx.loop();
+  soundFx.setVolume(0);
 }
 
 function draw() {
@@ -26,7 +31,19 @@ function draw() {
   let scaleX = width / videoW;
   let scaleY = height / videoH;
 
+  // manejo de la opacidad de la máscara
   if (faces.length > 0) {
+    maskAlpha = lerp(maskAlpha, 255, 0.009);
+    soundVol = lerp(soundVol, 1, 0.02);
+  } else {
+    maskAlpha = lerp(maskAlpha, 0, 0.05);
+    soundVol = lerp(soundVol, 0, 0.025);
+  }
+
+  // aplicar volumen suavizado
+  soundFx.setVolume(soundVol);
+
+  if (faces.length > 0 && maskAlpha > 1) {
     face = faces[0];
     let {
       x: ovalX,
@@ -39,13 +56,13 @@ function draw() {
     pixelOval.filter(BLUR, 5);
     pixelOval.filter(POSTERIZE);
 
+    // creación de máscara
     let maskImg = createGraphics(ovalWidth, ovalHeight);
-    maskImg.noStroke();
-    maskImg.fill(255);
     maskImg.ellipse(ovalWidth / 2, ovalHeight / 2, ovalWidth, ovalHeight);
-
     pixelOval.mask(maskImg);
 
+    push();
+    tint(255, maskAlpha);
     image(
       pixelOval,
       ovalX * scaleX,
@@ -53,6 +70,7 @@ function draw() {
       ovalWidth * scaleX,
       ovalHeight * scaleY
     );
+    pop();
   }
 }
 
@@ -63,10 +81,6 @@ function mousePressed() {
 function windowResized() {
   resizeCanvas(window.innerWidth, window.innerHeight);
 }
-
-/**
- * helpers
- */
 
 function gotFace(result) {
   faces = result;
